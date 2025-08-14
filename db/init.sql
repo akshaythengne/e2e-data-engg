@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS crypto_prices (
+    id SERIAL PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    price_usd NUMERIC(12, 6) NOT NULL,
+    ts TIMESTAMP NOT NULL
+);
