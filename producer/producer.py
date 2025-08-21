@@ -5,10 +5,11 @@ import requests
 from kafka import KafkaProducer
 from wal_manager import write_wal, read_wal, clear_wal
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
-BROKER = os.getenv("KAFKA_BROKER")
+BROKER = "localhost:9092"
 TOPIC = os.getenv("KAFKA_TOPIC")
 
 producer = KafkaProducer(
@@ -17,13 +18,15 @@ producer = KafkaProducer(
 )
 
 def fetch_crypto_price():
-    url = "https://api.coindesk.com/v1/bpi/currentprice/BTC.json"
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
     r = requests.get(url)
     data = r.json()
+    if "bitcoin" not in data:
+        return None  # skip this cycle if API fails
     return {
         "symbol": "BTC",
-        "price_usd": data["bpi"]["USD"]["rate_float"],
-        "ts": data["time"]["updatedISO"]
+        "price_usd": data["bitcoin"]["usd"],
+        "ts": datetime.utcnow().isoformat()  # Current UTC timestamp
     }
 
 def send_message(msg):
@@ -42,7 +45,11 @@ if __name__ == "__main__":
 
     while True:
         msg = fetch_crypto_price()
-        write_wal(json.dumps(msg))
-        send_message(msg)
-        print(f"Produced: {msg}")
-        time.sleep(10)
+        if msg:
+            write_wal(json.dumps(msg))
+            send_message(msg)
+            print(f"Produced: {msg}")
+            time.sleep(100) # Sleep for 10 seconds before next fetch
+        else:
+            print("Skipped - API response invalid")
+            time.sleep(10)

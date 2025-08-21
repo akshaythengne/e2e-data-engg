@@ -25,6 +25,8 @@ schema = StructType([
     StructField("ts", StringType(), True)
 ])
 
+print('This has started working')
+
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \

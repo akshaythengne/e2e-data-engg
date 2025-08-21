@@ -25,24 +25,47 @@ services:
       ALLOW_ANONYMOUS_LOGIN: "yes"  # Simple auth for local dev
 
   kafka:
-    image: bitnami/kafka:latest  # Kafka broker
+    image: bitnami/kafka:3.6.2  # Kafka broker
     container_name: kafka
     restart: always
     ports:
       - "9092:9092"  # Kafka client connection port
     environment:
-      KAFKA_CFG_PROCESS_ROLES: broker
-      KAFKA_CFG_NODE_ID: 1
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_BROKER_ID: 1
       KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # Bind both listeners
+      KAFKA_CFG_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+
+      # Tell clients how to reach them
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+
+      # Protocol mapping
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+
+      # Brokers talk via internal network
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+
+      ALLOW_PLAINTEXT_LISTENER: "yes"
     depends_on:
       - zookeeper
+
+  spark:
+    image: bitnami/spark:latest
+    container_name: spark
+    environment:
+      - SPARK_MODE=master
+      - SPARK_HOME=/opt/bitnami/spark
+      - HOME=/tmp   # <-- add this
+    ports:
+      - "8080:8080"
+    volumes:
+    - ./spark-apps:/opt/spark-apps
+    - ./spark-data:/opt/spark-data
+    entrypoint: [ "sleep", "infinity" ]
+    depends_on:
+      - kafka
+      - postgres
 
   # PostgreSQL Admin Tool
   pgadmin:
@@ -65,7 +88,7 @@ services:
     ports:
       - "9000:9000"  # Access Kafdrop at http://localhost:9000
     environment:
-      KAFKA_BROKERCONNECT: kafka:9092
+      KAFKA_BROKERCONNECT: "kafka:29092"
     depends_on:
       - kafka
 
